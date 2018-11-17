@@ -18,41 +18,67 @@ import os
 import math
 import asyncdispatch
 
+const InitialWaitMilsecs = 1 * 1000
+
 type
   Backoff* = ref object
     currentRetries: int
+    waitMilsecs: int
     maxRetries: int
     maxWaitMilsecs: int
+    fake: bool
 
   ExceedsMaxRetriesError = object of Exception
 
-proc newBackoff*(maxRetries: int = 0, maxWaitMilsecs: int = 0): Backoff =
-  return Backoff(
+proc newBackoff(maxRetries: int, maxWaitMilsecs: int, fake: bool): Backoff =
+  result = Backoff(
     currentRetries: 1,
+    waitMilsecs: InitialWaitMilsecs,
     maxRetries: maxRetries,
-    maxWaitMilsecs: maxWaitMilsecs
+    maxWaitMilsecs: maxWaitMilsecs,
+    fake: fake
   )
 
+proc newBackoff*(maxRetries: int = 0, maxWaitMilsecs: int = 0): Backoff =
+  result = newBackoff(maxRetries, maxWaitMilsecs, false)
+
 proc exceedsMaxRetries*(backoff: Backoff): bool =
+  if backoff.maxRetries < 1:
+    return false
   result = backoff.currentRetries > backoff.maxRetries
 
-proc waitMilsecs*(backoff: Backoff): int =
-  result = (backoff.currentRetries ^ 2) * 1000
+proc updateWaitMilsecs(backoff: Backoff) =
+  var milsecs = backoff.waitMilsecs * 2
   if backoff.maxWaitMilsecs > 0:
-    result = min(result, backoff.maxWaitMilsecs)
+    milsecs = min(milsecs, backoff.maxWaitMilsecs)
+  backoff.waitMilsecs = milsecs
 
 proc wait*(backoff: Backoff) =
   if backoff.exceedsMaxRetries:
     raise newException(ExceedsMaxRetriesError, "")
   let milsecs = backoff.waitMilsecs
-  if milsecs > 0:
+  if milsecs > 0 and not backoff.fake:
     sleep(milsecs)
   backoff.currentRetries += 1
+  backoff.updateWaitMilsecs()
 
 proc waitAsync*(backoff: Backoff) {.async.} =
   if backoff.exceedsMaxRetries:
     raise newException(ExceedsMaxRetriesError, "")
   let milsecs = backoff.waitMilsecs
-  if milsecs > 0:
+  if milsecs > 0 and not backoff.fake:
     await sleepAsync(milsecs)
   backoff.currentRetries += 1
+  backoff.updateWaitMilsecs()
+
+when defined(testing):
+  let backoff = newBackoff(0, 0, true)
+  assert backoff.waitMilsecs == 1000
+  backoff.wait()
+  assert backoff.waitMilsecs == 2000
+  backoff.wait()
+  assert backoff.waitMilsecs == 4000
+  waitFor backoff.waitAsync()
+  assert backoff.waitMilsecs == 8000
+  waitFor backoff.waitAsync()
+  assert backoff.waitMilsecs == 16000
