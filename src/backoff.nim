@@ -53,14 +53,17 @@ proc updateWaitMilsecs(backoff: Backoff) =
     milsecs = min(milsecs, backoff.maxWaitMilsecs)
   backoff.waitMilsecs = milsecs
 
+proc retry(backoff: Backoff) =
+  backoff.currentRetries += 1
+  backoff.updateWaitMilsecs()
+
 proc wait*(backoff: Backoff) =
   if backoff.exceedsMaxRetries:
     raise newException(ExceedsMaxRetriesError, "")
   let milsecs = backoff.waitMilsecs
   if milsecs > 0 and not backoff.fake:
     sleep(milsecs)
-  backoff.currentRetries += 1
-  backoff.updateWaitMilsecs()
+  backoff.retry()
 
 proc waitAsync*(backoff: Backoff) {.async.} =
   if backoff.exceedsMaxRetries:
@@ -68,8 +71,7 @@ proc waitAsync*(backoff: Backoff) {.async.} =
   let milsecs = backoff.waitMilsecs
   if milsecs > 0 and not backoff.fake:
     await sleepAsync(milsecs)
-  backoff.currentRetries += 1
-  backoff.updateWaitMilsecs()
+  backoff.retry()
 
 when defined(testing):
   let backoff = newBackoff(0, 0, true)
