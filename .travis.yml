@@ -12,6 +12,8 @@ before_script:
     - set -e
     - set -x
 script:
-    - cd test
+    - cd src
+    - find . -name "*.nim" | xargs -I {} nim c -r -d:testing -o:test {}
+    - cd ../test
     - find . -name "*.nim" | xargs -I {} nim c -r {}
     - cd ..
