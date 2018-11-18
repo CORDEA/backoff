@@ -17,50 +17,42 @@
 import os
 import math
 import asyncdispatch
+import backoffcalculator
 
 const InitialWaitMilsecs = 1 * 1000
 
 type
   Backoff* = ref object
     currentRetries: int
-    waitMilsecs: int
     maxRetries: int
-    maxWaitMilsecs: int
+    calculator: BackoffCalculator
     fake: bool
 
   ExceedsMaxRetriesError = object of Exception
 
-proc newBackoff(maxRetries: int, maxWaitMilsecs: int, fake: bool): Backoff =
+proc newBackoff(jitterType: JitterType, maxRetries: int, maxWaitMilsecs: int, fake: bool): Backoff =
   result = Backoff(
     currentRetries: 0,
-    waitMilsecs: InitialWaitMilsecs,
     maxRetries: maxRetries,
-    maxWaitMilsecs: maxWaitMilsecs,
+    calculator: newBackoffCalculator(jitterType, InitialWaitMilsecs, maxWaitMilsecs),
     fake: fake
   )
 
-proc newBackoff*(maxRetries: int = 0, maxWaitMilsecs: int = 0): Backoff =
-  result = newBackoff(maxRetries, maxWaitMilsecs, false)
+proc newBackoff*(jitterType: JitterType, maxRetries: int = 0, maxWaitMilsecs: int = 0): Backoff =
+  result = newBackoff(jitterType, maxRetries, maxWaitMilsecs, false)
 
 proc exceedsMaxRetries*(backoff: Backoff): bool =
   if backoff.maxRetries < 1:
     return false
   result = backoff.currentRetries >= backoff.maxRetries
 
-proc updateWaitMilsecs(backoff: Backoff) =
-  var milsecs = backoff.waitMilsecs * 2
-  if backoff.maxWaitMilsecs > 0:
-    milsecs = min(milsecs, backoff.maxWaitMilsecs)
-  backoff.waitMilsecs = milsecs
-
 proc retry(backoff: Backoff) =
   backoff.currentRetries += 1
-  backoff.updateWaitMilsecs()
 
 proc wait*(backoff: Backoff) =
   if backoff.exceedsMaxRetries:
     raise newException(ExceedsMaxRetriesError, "")
-  let milsecs = backoff.waitMilsecs
+  let milsecs = backoff.calculator.calculate()
   if milsecs > 0 and not backoff.fake:
     sleep(milsecs)
   backoff.retry()
@@ -68,24 +60,13 @@ proc wait*(backoff: Backoff) =
 proc waitAsync*(backoff: Backoff) {.async.} =
   if backoff.exceedsMaxRetries:
     raise newException(ExceedsMaxRetriesError, "")
-  let milsecs = backoff.waitMilsecs
+  let milsecs = backoff.calculator.calculate()
   if milsecs > 0 and not backoff.fake:
     await sleepAsync(milsecs)
   backoff.retry()
 
 when defined(testing):
-  var backoff = newBackoff(0, 0, true)
-  assert backoff.waitMilsecs == 1000
-  backoff.wait()
-  assert backoff.waitMilsecs == 2000
-  backoff.wait()
-  assert backoff.waitMilsecs == 4000
-  waitFor backoff.waitAsync()
-  assert backoff.waitMilsecs == 8000
-  waitFor backoff.waitAsync()
-  assert backoff.waitMilsecs == 16000
-
-  backoff = newBackoff(3, 0, true)
+  let backoff = newBackoff(TypeNo, 3, 0, true)
   assert(not backoff.exceedsMaxRetries)
   backoff.wait()
   assert(not backoff.exceedsMaxRetries)
@@ -99,14 +80,3 @@ when defined(testing):
   except ExceedsMaxRetriesError:
     raised = true
   assert raised
-
-  backoff = newBackoff(0, 4000, true)
-  assert backoff.waitMilsecs == 1000
-  backoff.wait()
-  assert backoff.waitMilsecs == 2000
-  backoff.wait()
-  assert backoff.waitMilsecs == 4000
-  waitFor backoff.waitAsync()
-  assert backoff.waitMilsecs == 4000
-  waitFor backoff.waitAsync()
-  assert backoff.waitMilsecs == 4000
