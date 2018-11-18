@@ -23,6 +23,7 @@ type
   BackoffCalculator* = ref object of RootObj
     maxWaitMilsecs: int
     waitMilsecs: int
+    initialWaitMilsecs: int
 
   FullBackoffCalculator* = ref object of BackoffCalculator
   EqualBackoffCalculator* = ref object of BackoffCalculator
@@ -31,16 +32,19 @@ type
 proc newBackoffCalculator*(jitterType: JitterType, initialWaitMilsecs: int, maxWaitMilsecs: int): BackoffCalculator =
   case jitterType
   of TypeNo:
-    result = BackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+    result = BackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, initialWaitMilsecs: initialWaitMilsecs)
   of TypeFull:
-    result = FullBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+    result = FullBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, initialWaitMilsecs: initialWaitMilsecs)
   of TypeEqual:
-    result = EqualBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+    result = EqualBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, initialWaitMilsecs: initialWaitMilsecs)
   of TypeDecorrelated:
-    result = DecorrelatedBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+    result = DecorrelatedBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, initialWaitMilsecs: initialWaitMilsecs)
 
 proc internalCalculate(calc: BackoffCalculator): int =
-  result = calc.waitMilsecs * 2
+  if calc.waitMilsecs <= 0:
+    result = calc.initialWaitMilsecs
+  else:
+    result = calc.waitMilsecs * 2
   if calc.maxWaitMilsecs > 0:
     result = min(result, calc.maxWaitMilsecs)
   calc.waitMilsecs = result
@@ -58,7 +62,11 @@ method calculate*(calc: EqualBackoffCalculator): int =
   result = divide + rand(divide)
 
 method calculate*(calc: DecorrelatedBackoffCalculator): int =
-  result = rand(calc.waitMilsecs * 3)
+  if calc.waitMilsecs <= 0:
+    result = calc.initialWaitMilsecs
+  else:
+    result = calc.waitMilsecs
+  result = rand((result * 3) - calc.initialWaitMilsecs) + calc.initialWaitMilsecs
   if calc.maxWaitMilsecs > 0:
     result = min(result, calc.maxWaitMilsecs)
   calc.waitMilsecs = result
