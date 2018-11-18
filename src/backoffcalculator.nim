@@ -17,8 +17,10 @@
 import random
 
 type
+  JitterType* = enum
+    TypeNo, TypeFull, TypeEqual, TypeDecorrelated
+
   BackoffCalculator = ref object of RootObj
-    initialWaitMilsecs: int
     maxWaitMilsecs: int
     waitMilsecs: int
 
@@ -26,7 +28,17 @@ type
   FullBackoffCalculator* = ref object of BackoffCalculator
   EqualBackoffCalculator* = ref object of BackoffCalculator
   DecorrelatedBackoffCalculator* = ref object of BackoffCalculator
-    prevWaitMilsecs: int
+
+proc newBackoffCalculator*(jitterType: JitterType, initialWaitMilsecs: int, maxWaitMilsecs: int): BackoffCalculator =
+  case jitterType
+  of TypeNo:
+    result = NoBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+  of TypeFull:
+    result = FullBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+  of TypeEqual:
+    result = EqualBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+  of TypeDecorrelated:
+    result = DecorrelatedBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
 
 method calculate(calc: BackoffCalculator): int {.base.} =
   result = calc.waitMilsecs * 2
