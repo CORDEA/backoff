@@ -16,22 +16,27 @@
 
 import times
 import backoff
+import asyncdispatch
 import backoff / jittertype
 
 type
   FakeClient = ref object
     count: int
 
-proc request(client: FakeClient): bool =
+proc request(client: FakeClient): Future[bool] {.async.} =
+  await sleepAsync(100)
   client.count += 1
   return client.count > 5
 
-let
-  client = FakeClient(count: 0)
-  waiter = newBackoff(TypeNo, 10, 8000)
-while true:
-  if client.request():
-    break
-  let before = epochTime()
-  waiter.wait()
-  echo "Failed to request. waited " & $(epochTime() - before) & " seconds."
+proc main() {.async.} =
+  let
+    client = FakeClient(count: 0)
+    waiter = newBackoff(TypeNo, 10, 8000)
+  while true:
+    if await client.request():
+      break
+    let before = epochTime()
+    await waiter.waitAsync()
+    echo "Failed to request. waited " & $(epochTime() - before) & " seconds."
+
+waitFor main()

@@ -15,11 +15,9 @@
 # date  : 2018-11-18
 
 import random
+import jittertype
 
 type
-  JitterType* = enum
-    TypeNo, TypeFull, TypeEqual, TypeDecorrelated
-
   BackoffCalculator* = ref object of RootObj
     maxWaitMilsecs: int
     waitMilsecs: int

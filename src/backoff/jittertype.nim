@@ -14,29 +14,6 @@
 # Author: Yoshihiro Tanaka <contact@cordea.jp>
 # date  : 2018-11-18
 
-import times
-import asyncdispatch
-import backoff
-import backoffcalculator
-
 type
-  FakeClient = ref object
-    count: int
-
-proc request(client: FakeClient): Future[bool] {.async.} =
-  await sleepAsync(100)
-  client.count += 1
-  return client.count > 5
-
-proc main() {.async.} =
-  let
-    client = FakeClient(count: 0)
-    waiter = newBackoff(TypeNo, 10, 8000)
-  while true:
-    if await client.request():
-      break
-    let before = epochTime()
-    await waiter.waitAsync()
-    echo "Failed to request. waited " & $(epochTime() - before) & " seconds."
-
-waitFor main()
+  JitterType* = enum
+    TypeNo, TypeFull, TypeEqual, TypeDecorrelated

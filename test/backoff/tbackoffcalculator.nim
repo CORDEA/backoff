@@ -15,7 +15,8 @@
 # date  : 2018-11-18
 
 import unittest
-import .. / src / backoffcalculator
+import .. / .. / src / backoff / jittertype
+import .. / .. / src / backoff / backoffcalculator
 
 suite "BackoffCalculator test":
   test "no backoff":

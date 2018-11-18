@@ -17,7 +17,8 @@
 import os
 import math
 import asyncdispatch
-import backoffcalculator
+import backoff / jittertype
+import backoff / backoffcalculator
 
 const InitialWaitMilsecs = 1 * 1000
 
