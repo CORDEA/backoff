@@ -1,6 +1,6 @@
 # backoff
 
-Exponential Backoff library for nim.
+Implementation of exponential backoff for nim.
 
 ## Jitter
 
