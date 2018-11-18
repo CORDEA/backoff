@@ -20,11 +20,10 @@ type
   JitterType* = enum
     TypeNo, TypeFull, TypeEqual, TypeDecorrelated
 
-  BackoffCalculator = ref object of RootObj
+  BackoffCalculator* = ref object of RootObj
     maxWaitMilsecs: int
     waitMilsecs: int
 
-  NoBackoffCalculator* = ref object of BackoffCalculator
   FullBackoffCalculator* = ref object of BackoffCalculator
   EqualBackoffCalculator* = ref object of BackoffCalculator
   DecorrelatedBackoffCalculator* = ref object of BackoffCalculator
@@ -32,7 +31,7 @@ type
 proc newBackoffCalculator*(jitterType: JitterType, initialWaitMilsecs: int, maxWaitMilsecs: int): BackoffCalculator =
   case jitterType
   of TypeNo:
-    result = NoBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
+    result = BackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
   of TypeFull:
     result = FullBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
   of TypeEqual:
@@ -40,21 +39,21 @@ proc newBackoffCalculator*(jitterType: JitterType, initialWaitMilsecs: int, maxW
   of TypeDecorrelated:
     result = DecorrelatedBackoffCalculator(maxWaitMilsecs: maxWaitMilsecs, waitMilsecs: initialWaitMilsecs)
 
-method calculate(calc: BackoffCalculator): int {.base.} =
+proc internalCalculate(calc: BackoffCalculator): int =
   result = calc.waitMilsecs * 2
   if calc.maxWaitMilsecs > 0:
     result = min(result, calc.maxWaitMilsecs)
   calc.waitMilsecs = result
 
-method calculate*(calc: NoBackoffCalculator): int =
-  result = calc.BackoffCalculator.calculate()
+method calculate*(calc: BackoffCalculator): int {.base.} =
+  result = calc.internalCalculate()
 
 method calculate*(calc: FullBackoffCalculator): int =
-  result = calc.BackoffCalculator.calculate()
+  result = calc.internalCalculate()
   result = rand(result)
 
 method calculate*(calc: EqualBackoffCalculator): int =
-  result = calc.BackoffCalculator.calculate()
+  result = calc.internalCalculate()
   let divide = int(result / 2)
   result = divide + rand(divide)
 
