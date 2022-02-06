@@ -9,3 +9,7 @@ srcDir      = "src"
 # Deps
 
 requires "nim >= 0.18.0"
+
+task test, "Test backoff":
+  exec "find src/ -name \"*.nim\" | xargs -I {} nim c -r -d:testing -o:test {}"
+  exec "find test/ -name \"*.nim\" | xargs -I {} nim c -r {}"
