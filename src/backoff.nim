@@ -29,7 +29,7 @@ type
     calculator: BackoffCalculator
     fake: bool
 
-  ExceedsMaxRetriesError = object of Exception
+  ExceedsMaxRetriesError* = object of CatchableError
 
 proc newBackoff(jitterType: JitterType, maxRetries: int, maxWaitMilsecs: int, fake: bool): Backoff =
   result = Backoff(
